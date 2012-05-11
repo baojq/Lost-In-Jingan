@@ -1,0 +1,594 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" >
+<head>
+    <title>jingan</title>
+    <style type="text/css">
+    *{margin:0;padding:0;}
+    #jaMap
+    {
+        margin:20px;
+        border:1px solid #35496A;
+    }
+    p{margin:0 0 0 20px;}
+    button{padding:5px;}
+    </style>
+    <script type="text/javascript">
+        var coorPoints = [
+            [[40, 20], [80, 20], [80, 30], [60, 30], [60, 50], [40, 50]],
+            [[50, 60], [70, 60], [70, 70], [50, 70]],
+            [[30, 80], [50, 80], [50, 120], [30, 120]],
+            [[20, 130], [50, 130], [50, 180], [40, 180], [40, 150], [20, 150]],
+            [[40, 230], [80, 230], [80, 260], [40, 260]],
+            [[20, 280], [80, 280], [80, 350], [60, 350], [60, 300], [0, 300]],
+            [[90, 26], [150, 26], [150, 56], [90, 56]],
+            [[60, 84], [120, 84], [120, 140], [60, 140]],
+            [[90, 180], [180, 180], [180, 230], [90, 230]],
+            [[84, 240], [160, 240], [160, 258], [120, 258], [120, 270], [84, 264]],
+            [[90, 280], [150, 280], [150, 295], [90, 290]],
+            [[160, 26], [230, 26], [230, 70], [160, 70]],
+            [[140, 100], [164, 100], [164, 80], [226, 80], [226, 180], [140, 180]],
+            [[156, 282], [226, 290], [200, 310], [200, 380], [190, 380], [190, 310]],
+            [[250, 20], [280, 20], [280, 36], [260, 36], [260, 28], [250, 28]],
+            [[260, 50], [280, 50], [280, 130], [250, 130]],
+            [[190, 190], [230, 190], [230, 264], [190, 264]],
+            [[234, 180], [240, 180], [240, 160], [280, 160], [280, 220], [270, 220], [270, 240], [250, 240], [250, 220], [240, 220], [240, 240], [234, 240]],
+            [[240, 244], [250, 244], [250, 280], [240, 280]],
+            [[254, 270], [260, 270], [260, 240], [274, 240], [274, 280], [254, 280]],
+            [[230, 290], [260, 300], [260, 380], [220, 380], [220, 310]]
+        ]
+        var aryAll = new Array();//所有顶点
+        var aryLength = new Array();//终点与所有点之间的距离
+        var aryLengthSort = new Array(); //终点与所有点之间的距离从小到大排
+        var aryNext = new Array();//与起点相邻的无碰撞点
+        var aryAllLine = new Array(); //组成多边形的所有线段
+        var startPoint = { x: 300, y: 100, text: 'Just Another', textY: 120 };
+        var endPoint = { x: 300, y: 200, text: 'EF Labs', textY: 215 };
+        window.onload = function () {
+            var jaMap = document.getElementById("jaMap");
+            var drawMap = jaMap.getContext('2d');
+
+            drawMap.beginPath(); //终点 红色
+            drawMap.fillStyle = "#FF0000";
+            drawMap.arc(endPoint.x + 100, endPoint.y + 100, 5, 0, Math.PI * 2, true);
+            drawMap.closePath();
+            drawMap.fill();
+            drawMap.fillText(endPoint.text, endPoint.x + 100, endPoint.textY + 100);
+
+
+
+            drawMap.beginPath(); //起点
+            drawMap.fillStyle = "#008B8B";
+            drawMap.arc(startPoint.x + 100, startPoint.y + 100, 5, 0, Math.PI * 2, true);
+            drawMap.closePath();
+            drawMap.fill();
+            drawMap.fillText(startPoint.text, startPoint.x + 100, startPoint.textY + 100);
+
+            
+            //画出所有的多边形，并将所有的顶点加入数组
+
+            for (var i = 0; i < coorPoints.length; i++) {
+                var colorStr = Math.floor(Math.random() * 0xFFFFFF).toString(16).toUpperCase();
+                drawMap.fillStyle = "#" + colorStr;
+                drawMap.beginPath();
+                for (var j = 0; j < coorPoints[i].length; j++) {
+                    aryAll.push([coorPoints[i][j][0] + 100, coorPoints[i][j][1] + 100]);
+                    if (j == 0)
+                    { drawMap.moveTo(coorPoints[i][j][0] + 100, coorPoints[i][j][1] + 100); }
+                    else
+                    { drawMap.lineTo(coorPoints[i][j][0] + 100, coorPoints[i][j][1] + 100); }
+
+                    if (j == coorPoints[i].length - 1)
+                    { aryAllLine.push([movePoint(coorPoints[i][j], 100), movePoint(coorPoints[i][0], 100)]) }
+                    else
+                    { aryAllLine.push([movePoint(coorPoints[i][j], 100), movePoint(coorPoints[i][j + 1], 100)]); }
+                }
+                drawMap.closePath();
+                drawMap.fill();
+            }
+            getXOverLine();//获取重叠的线段，以避免从这条线上走
+            getYOverLine();//获取重叠的线段，以避免从这条线上走
+            for (var i = 0; i < aryAll.length; i++) {
+                //算出终点与所有顶点的距离
+                aryLength.push([
+                    getLength([endPoint.x + 100, endPoint.y + 100], [aryAll[i][0], aryAll[i][1]]),
+                    [aryAll[i][0], aryAll[i][1]]
+                ]);
+                aryLengthSort.push([
+                    getLength([endPoint.x + 100, endPoint.y + 100], [aryAll[i][0], aryAll[i][1]]),
+                    [aryAll[i][0], aryAll[i][1]]
+                ]);
+
+                ///得到与起点相邻的顶点
+                if (!checkAllPolygonCross([startPoint.x + 100, startPoint.y + 100], [aryAll[i][0], aryAll[i][1]])) {
+                    if (aryAll[i][0] != (startPoint.x + 100) || aryAll[i][1] != (startPoint.y + 100))
+                    { aryNext.push([[aryAll[i][0], aryAll[i][1]], []]); }
+                }
+
+            }
+
+            //将所有顶点按与终点的距离从小到大排序
+            bubbleSort(aryLengthSort, 0, aryLengthSort.length - 1);
+
+            aryAllUsedPath = new Array();
+
+            //得到第二层相邻点
+            for (i = 0; i < aryNext.length; i++) {
+                for (var j = 0; j < aryAll.length; j++) {
+                    if (!checkAllPolygonCross(aryNext[i][0], [aryAll[j][0], aryAll[j][1]])) {
+                        if (aryAll[j][0] != aryNext[i][0][0] || aryAll[j][1] != aryNext[i][0][1]) {
+                            aryNext[i][1].push([aryAll[j][0], aryAll[j][1]]);
+                        }
+                    }
+                }
+            }
+
+            //以第二层相邻点为起点得到每个二层相邻点与终点的路径
+            for (i = 0; i < aryNext.length; i++) {
+                aryUsedPt = new Array();
+                aryUsedPath = new Array();
+                iUsedPath = 0;
+                distance1 = getLength([startPoint.x + 100, startPoint.y + 100], aryNext[i][0]); //得到起点与第一层相邻点的距离
+                findPath(aryNext[i][0], aryNext[i][0]);
+                for (k = 0; k < aryUsedPath.length; k++) {
+                    aryUsedPath[k][0] += distance1;
+                    aryUsedPath[k][1].unshift([startPoint.x + 100, startPoint.y + 100]);
+                    aryAllUsedPath.push(aryUsedPath[k]);
+                }
+
+                /////////////////////////////////////
+                for (j = 0; j < aryNext[i][1].length; j++) {
+                    aryUsedPt = new Array();
+                    aryUsedPath = new Array();
+                    iUsedPath = 0;
+
+                    distance2 = getLength(aryNext[i][0], aryNext[i][1][j]); //得到第一层相邻点与第二层相邻点的距离
+                    findPath(aryNext[i][1][j], aryNext[i][1][j]);
+                    for (k = 0; k < aryUsedPath.length; k++) {
+                        aryUsedPath[k][0] += distance1 + distance2;
+                        aryUsedPath[k][1].unshift(aryNext[i][0]);
+                        aryUsedPath[k][1].unshift([startPoint.x + 100, startPoint.y + 100]);
+                        aryAllUsedPath.push(aryUsedPath[k]);
+                    }
+                }
+            }
+            bubbleSort(aryAllUsedPath, 0, aryAllUsedPath.length - 1);
+
+            drawFinalMinPath();
+        }
+        var aryAllUsedPath;
+        var aryUsedPt = new Array();
+        var aryUsedPath = new Array();
+        iUsedPath = 0;
+        iDead = 0;
+        var jaMap;
+        var drawMap;
+        function findPath(startPt, firstStartPt) {
+
+            if (!checkAllPolygonCross(startPt, [endPoint.x + 100, endPoint.y + 100])) {
+
+                    var firstSuccess = false;
+                    if (aryUsedPath.length == 0) {
+                        aryUsedPath.push([0, [firstStartPt]])
+                        firstSuccess = true;
+                    }
+                    aryUsedPath[iUsedPath][0] += getLength(startPt, [endPoint.x + 100, endPoint.y + 100]);
+                    aryUsedPath[iUsedPath][1].push([endPoint.x + 100, endPoint.y + 100]);
+
+                    if (firstSuccess) return true;
+                    aryUsedPath.push([0, new Array()])
+                    iUsedPath++;
+                    findPath(firstStartPt, firstStartPt);
+                }
+                for (var i = 0; i < aryLengthSort.length; i++) {
+                    var used = false;
+                    for (var j = 0; j < aryUsedPt.length; j++) {
+                        if (aryUsedPt[j] == i) {
+                            used = true;
+                            break;
+                        }
+                    }
+                    if (startPt[0] == aryLengthSort[i][1][0] && startPt[1] == aryLengthSort[i][1][1]) {
+                        continue;
+                    }
+                    if (used) {
+                        continue;
+                    }
+
+                    if (!checkAllPolygonCross(startPt, aryLengthSort[i][1])) {
+                        break;
+                    }
+                }
+                if (i == aryLengthSort.length) {
+                    if (iDead = 100) return true;
+                    iDead += 1;
+                    var xxx = 0;
+
+                }
+                else { 
+                    if (aryUsedPath.length==0) {
+                        aryUsedPath.push([0, new Array()])
+                        
+                    }
+                    if (aryUsedPath[iUsedPath][1].length == 0) {
+                        aryUsedPath[iUsedPath][1].push(firstStartPt);
+                    }
+                    aryUsedPath[iUsedPath][0] += getLength(startPt, aryLengthSort[i][1]);
+                    aryUsedPath[iUsedPath][1].push(aryLengthSort[i][1]);
+                    aryUsedPt.push(i);
+                    findPath(aryLengthSort[i][1], firstStartPt);            
+                
+                }
+           
+        }
+
+        function drawFinalMinPath() {
+            var outPut = document.getElementById('outPut');
+            if (!checkAllPolygonCross([startPoint.x+100, startPoint.y+100], [endPoint.x+100, endPoint.y+100]))
+            {
+                outPut.innerHTML += '(' + startPoint.x + ',' + startPoint.y + '),(' + endPoint.x + ',' + endPoint.y + ')<br />';
+                var l = getLength([startPoint.x + 100, startPoint.y + 100], [endPoint.x + 100, endPoint.y + 100]);
+                outPut.innerHTML += 'Length:' + parseInt(l);
+                drawLine([startPoint.x + 100, startPoint.y + 100], [endPoint.x + 100, endPoint.y + 100]);
+                return true;
+            }
+            for (i = 0; i < aryAllUsedPath.length; i++) {
+                if (aryAllUsedPath[i][0] > 0) {
+                    var cross = false;
+                    var iLength = aryAllUsedPath[i][1].length;
+                    if (aryAllUsedPath[i][1][iLength - 1][0] != (endPoint.x + 100) || aryAllUsedPath[i][1][iLength - 1][1] != (endPoint.y+100)) continue;
+                    for (var j = 0; j < aryAllUsedPath[i][1].length; j++) {
+                        if (j == aryAllUsedPath[i][1].length - 1) break;
+                        if (checkAllPolygonCross(aryAllUsedPath[i][1][j], aryAllUsedPath[i][1][j + 1]))
+                        { cross = true; break; }
+                    }
+                    if (cross) continue;
+                    for (j = 0; j < aryAllUsedPath[i][1].length; j++) {
+                        if (j == aryAllUsedPath[i][1].length - 1) break;
+                        drawLine(aryAllUsedPath[i][1][j], aryAllUsedPath[i][1][j + 1]);
+                        outPut.innerHTML += '(' + (aryAllUsedPath[i][1][j][0] - 100) + ',' + (aryAllUsedPath[i][1][j][1] - 100) + '),';
+                    }
+                    outPut.innerHTML += '(' + endPoint.x + ',' + endPoint.y + ')<br />';
+                    outPut.innerHTML += 'Length:' + parseInt(aryAllUsedPath[i][0]);
+                    break;
+                }
+            }
+        }
+        function reDraw(startP) {
+            iUsedPath = 0;
+            aryUsedPt = new Array();
+            aryUsedPath = new Array();
+            findPath(startP, startP);
+            drawMinPath(startP);
+        }
+        function drawLine(p1, p2) {
+            jaMap = document.getElementById("jaMap");
+            drawMap = jaMap.getContext('2d');
+
+            drawMap.beginPath();
+            drawMap.moveTo(p1[0], p1[1]);
+            drawMap.lineTo(p2[0], p2[1]);
+            drawMap.closePath();
+            drawMap.stroke();
+        }
+        //bubbleSortLength
+        function bubbleSort(inputArray, start, rest) {
+            for (var i = rest - 1; i >= start; i--) {
+                for (var j = start; j <= i; j++) {
+                    if (inputArray[j + 1][0] < inputArray[j][0]) {
+                        var tempValue = inputArray[j];
+                        inputArray[j] = inputArray[j + 1];
+                        inputArray[j + 1] = tempValue;
+                    }
+                }
+            }
+            return inputArray;
+        }
+
+        //两点间距离
+        function getLength(point1, point2) {
+            return Math.sqrt((point1[0] - point2[0]) * (point1[0] - point2[0]) + (point1[1] - point2[1]) * (point1[1] - point2[1]));
+        }
+
+        //计算叉乘
+        var crossMul = function (v1, v2) {
+            return v1.x * v2.y - v1.y * v2.x;
+        }
+        //相交返回true
+        var checkCross = function (p1, p2, p3, p4) {
+            try {
+                var v1 = { x: p1[0] - p3[0], y: p1[1] - p3[1] },
+                v2 = { x: p2[0] - p3[0], y: p2[1] - p3[1] },
+                v3 = { x: p4[0] - p3[0], y: p4[1] - p3[1] },
+                vv1 = crossMul(v1, v3) * crossMul(v2, v3)
+                v1 = { x: p3[0] - p1[0], y: p3[1] - p1[1] }
+                v2 = { x: p4[0] - p1[0], y: p4[1] - p1[1] }
+                v3 = { x: p2[0] - p1[0], y: p2[1] - p1[1] }
+                vv2 = crossMul(v1, v3) * crossMul(v2, v3);
+                return (vv1 < 0 && vv2 < 0) ? true : false
+            }
+            catch (ex) {
+                e = ex.Message;
+            }
+
+        }
+
+        //p1,p2是线段端点
+        function checkAllPolygonCross(p1, p2) {
+            if (isXCrash(p1, p2)) { return true; }
+            if (isYCrash(p1, p2)) { return true; }
+            for (var i = 0; i < coorPoints.length; i++) {
+                var xxxx3344 = i;
+                for (var j = 0; j < coorPoints[i].length; j++) {
+
+                        
+
+                        if (j == coorPoints[i].length - 1) {
+                            if (checkCross(p1, p2, [coorPoints[i][j][0] + 100, coorPoints[i][j][1] + 100], [coorPoints[i][0][0] + 100, coorPoints[i][0][1] + 100]))
+                            { return true; }
+                        }
+                        else {
+                            if (checkCross(p1, p2, [coorPoints[i][j][0] + 100, coorPoints[i][j][1] + 100], [coorPoints[i][j + 1][0] + 100, coorPoints[i][j + 1][1] + 100]))
+                            { return true; }
+                        }
+                }
+                var centerP = getCenterPoint([p1[0] - 100, p1[1] - 100], [p2[0] - 100, p2[1] - 100]);
+                var centerP1_1 = getCenterPoint(centerP, [p1[0] - 100, p1[1] - 100]);
+                var centerP1_2 = getCenterPoint(centerP1_1, [p1[0] - 100, p1[1] - 100]);
+                var centerP2_1 = getCenterPoint(centerP, [p2[0] - 100, p2[1] - 100]);
+                var centerP2_2 = getCenterPoint(centerP2_1, [p2[0] - 100, p2[1] - 100]);
+
+                for (var j = 0; j < coorPoints[i].length; j++) {
+                    var bOver = false;
+                    if (j == coorPoints[i].length - 1) {
+                        bOver = isPointOnSegment(centerP, coorPoints[i][j], coorPoints[i][0]) ;
+                    }
+                    else {
+                        bOver = isPointOnSegment(centerP, coorPoints[i][j], coorPoints[i][j + 1]);
+                    }
+                    if (bOver) {
+                        break;
+                    }
+
+                }
+                if (!bOver && isPointInPoly(coorPoints[i], getCenterPoint([p1[0] - 100, p1[1] - 100], [p2[0] - 100, p2[1] - 100]))) return true;
+                for (var j = 0; j < coorPoints[i].length; j++) {
+                    var bOver1 = false;
+                    if (j == coorPoints[i].length - 1) {
+                        bOver1 = isPointOnSegment(centerP1_2, coorPoints[i][j], coorPoints[i][0]);
+                    }
+                    else {
+                        bOver1 = isPointOnSegment(centerP1_2, coorPoints[i][j], coorPoints[i][j + 1]);
+                    }
+                    if (bOver1) {
+                        break;
+                    }
+                }
+                if (!bOver1 && isPointInPoly(coorPoints[i], centerP1_2)) return true;
+                for (var j = 0; j < coorPoints[i].length; j++) {
+                    var bOver2 = false;
+                    if (j == coorPoints[i].length - 1) {
+                        bOver2 = isPointOnSegment(centerP1_2, coorPoints[i][j], coorPoints[i][0]);
+                    }
+                    else {
+                        bOver2 = isPointOnSegment(centerP1_2, coorPoints[i][j], coorPoints[i][j + 1]);
+                    }
+                    if (bOver2) {
+                        break;
+                    }
+                }
+
+                if (!bOver2 && isPointInPoly(coorPoints[i], centerP2_2)) return true;
+            }
+            return false;
+        }
+
+        //求中点
+        function getCenterPoint(p1, p2) {
+            var x = (p1[0] + p2[0]) / 2;
+            var y = (p1[1] + p2[1]) / 2;
+            return [x,y];
+        }
+
+        function isPointInPoly(poly, pt) {
+            for (var c = false, i = -1, l = poly.length, j = l - 1; ++i < l; j = i)
+                ((poly[i][1] <= pt[1] && pt[1] < poly[j][1]) || (poly[j][1] <= pt[1] && pt[1] < poly[i][1]))
+        && (pt[0] < (poly[j][0] - poly[i][0]) * (pt[1] - poly[i][1]) / (poly[j][1] - poly[i][1]) + poly[i][0])
+        && (c = !c);
+            return c;
+        }
+
+        function isPointOnLine(p1,p2,p3)//判断p1是否在p2 p3组成的直线上
+        {
+            if (p3[0] != p2[0]) {
+                var k = (p3[1] - p2[1]) / (p3[0] - p2[0])
+                //y=kx+b 斜截式
+                var b = p2[1] - k * p2[0]//得出截距
+
+                if (k * p1[0] + b == p1[1])
+                { return true; }
+            }
+            else {
+                if (p1[0] == p2[0])
+                {return true;}
+            }
+
+            return false;
+        }
+        function isPointOnSegment(p1, p2, p3)//判断p1是否在p2 p3组成的线段上
+        {
+            var s1 = getLength(p2, p1);
+            var s2 = getLength(p3, p1);
+            var sSeg = getLength(p2, p3);
+            if ((s1+s2)==sSeg) {
+                return true;
+            }
+
+            return false;
+        }
+        function isLineParallel(p1,p2,p3,p4)//判断p1,p2组成的直线是否与p2 p3组成的直线平行
+        {
+            if ((p1[0]==p2[0]) && (p3[0]==p4[0]))
+            {return true;}
+
+
+            var k1 = (p2[1]-p1[1])/(p2[0]-p1[0]);
+            var k2 = (p4[1]-p3[1])/(p4[0]-p3[0]);
+            var isPara = (k1==k2);
+            return isPara ;
+        }
+
+        function isDraw(p1,p2,p3,p4)//与所有多边形的边进行比较判断p1,p2的线是否可被画出，该函数的功能和一开始有差异
+        {
+            if (isLineParallel(p1,p2,p3,p4) && isPointOnLine(p1,p3,p4))//先判断两线是否平行，再判断A线的端点是否在B线段的直线上
+            {
+                return true;
+            }
+            return false;
+        }
+        function movePoint(p, distance) {
+            return [p[0] + distance, p[1] + distance];
+        }
+
+
+
+        var aryXOver = new Array();
+        var aryYOver = new Array();
+
+        function getXOverLine() {
+            for (var i = 0; i < aryAllLine.length; i++) {
+                for (var j = 0; j < aryAllLine.length; j++) {
+                    if (j != i && isDraw(aryAllLine[i][0], aryAllLine[i][1], aryAllLine[j][0], aryAllLine[j][1])) {
+                        if (aryAllLine[j][0][0] < aryAllLine[j][1][0]) {
+                            if (aryAllLine[i][0][0] > aryAllLine[j][0][0] && aryAllLine[i][0][0] < aryAllLine[j][1][0])
+                            { uniPush(aryXOver, aryAllLine[i][0]); }
+                            if (aryAllLine[i][1][0] > aryAllLine[j][0][0] && aryAllLine[i][1][0] < aryAllLine[j][1][0])
+                            { uniPush(aryXOver, aryAllLine[i][1]); }
+                        }
+                        else if (aryAllLine[j][0][0] > aryAllLine[j][1][0])
+                        {
+                            if (aryAllLine[i][0][0] < aryAllLine[j][0][0] && aryAllLine[i][0][0] > aryAllLine[j][1][0])
+                            { uniPush(aryXOver, aryAllLine[i][0]); }
+                            if (aryAllLine[i][1][0] < aryAllLine[j][0][0] && aryAllLine[i][1][0] > aryAllLine[j][1][0])
+                            { uniPush(aryXOver, aryAllLine[i][1]); }
+
+                        }
+                        ////////////////////////////////////////////////
+                        if (aryAllLine[i][0][0] < aryAllLine[i][1][0]) {
+                            if (aryAllLine[j][0][0] > aryAllLine[i][0][0] && aryAllLine[j][0][0] < aryAllLine[i][1][0])
+                            { uniPush(aryXOver, aryAllLine[j][0]); }
+                            if (aryAllLine[i][1][0] > aryAllLine[j][0][0] && aryAllLine[i][1][0] < aryAllLine[j][1][0])
+                            { uniPush(aryXOver, aryAllLine[j][1]); }
+                        }
+                        else if (aryAllLine[i][0][0] > aryAllLine[i][1][0])
+                        {
+                            if (aryAllLine[j][0][0] < aryAllLine[i][0][0] && aryAllLine[j][0][0] > aryAllLine[i][1][0])
+                            { uniPush(aryXOver, aryAllLine[j][0]); }
+                            if (aryAllLine[j][1][0] < aryAllLine[i][0][0] && aryAllLine[j][1][0] > aryAllLine[i][1][0])
+                            { uniPush(aryXOver,aryAllLine[j][1]); }
+
+                        }
+
+                    }
+                }
+            }
+        }
+        function getYOverLine() {
+            for (var i = 0; i < aryAllLine.length; i++) {
+                for (var j = 0; j < aryAllLine.length; j++) {
+                    if (j != i && isDraw(aryAllLine[i][0], aryAllLine[i][1], aryAllLine[j][0], aryAllLine[j][1])) {
+                        if (aryAllLine[j][0][1] < aryAllLine[j][1][1]) {
+                            if (aryAllLine[i][0][1] > aryAllLine[j][0][1] && aryAllLine[i][0][1] < aryAllLine[j][1][1])
+                            { uniPush(aryYOver, aryAllLine[i][0]); }
+                            if (aryAllLine[i][1][1] > aryAllLine[j][0][1] && aryAllLine[i][1][1] < aryAllLine[j][1][1])
+                            { uniPush(aryYOver, aryAllLine[i][1]); }
+                        }
+                        else if (aryAllLine[j][0][1] > aryAllLine[j][1][1]) {
+                            if (aryAllLine[i][0][1] < aryAllLine[j][0][1] && aryAllLine[i][0][1] > aryAllLine[j][1][1])
+                            { uniPush(aryYOver, aryAllLine[i][0]); }
+                            if (aryAllLine[i][1][1] < aryAllLine[j][0][1] && aryAllLine[i][1][1] > aryAllLine[j][1][1])
+                            { uniPush(aryYOver, aryAllLine[i][1]); }
+
+                        }
+                        ////////////////////////////////////////////////
+                        if (aryAllLine[i][0][1] < aryAllLine[i][1][1]) {
+                            if (aryAllLine[j][0][1] > aryAllLine[i][0][1] && aryAllLine[j][0][1] < aryAllLine[i][1][1])
+                            { uniPush(aryYOver, aryAllLine[j][0]); }
+                            if (aryAllLine[i][1][1] > aryAllLine[j][0][1] && aryAllLine[i][1][1] < aryAllLine[j][1][1])
+                            { uniPush(aryYOver, aryAllLine[j][1]); }
+                        }
+                        else if (aryAllLine[i][0][1] > aryAllLine[i][1][1]) {
+                            if (aryAllLine[j][0][1] < aryAllLine[i][0][1] && aryAllLine[j][0][1] > aryAllLine[i][1][1])
+                            { uniPush(aryYOver, aryAllLine[j][0]); }
+                            if (aryAllLine[j][1][1] < aryAllLine[i][0][1] && aryAllLine[j][1][1] > aryAllLine[i][1][1])
+                            { uniPush(aryYOver, aryAllLine[j][1]); }
+
+                        }
+
+                    }
+                }
+            }
+        }
+
+
+        function uniPush(ary,pt) {
+            for (var i = 0; i < ary.length; i++) {
+                if (pt[0] == ary[i][0] && pt[1] == ary[i][1]) {
+                    return false;
+                }
+            }
+            ary.push(pt);
+            return true;
+        }
+        function isXCrash(p1, p2) {
+            var bP1=false, bP2=false;
+            for (var i = 0; i < aryXOver.length; i++) {
+                if (p1[0] == aryXOver[i][0] && p1[1] == aryXOver[i][1]) {
+                    bP1 = true;
+                }
+                if (p2[0] == aryXOver[i][0] && p2[1] == aryXOver[i][1]) {
+                    bP2 = true;
+                }
+            }
+            if ((p1[1] ==  p2[1]) && bP1 && bP2) {
+                return true;
+            }
+            for (i = 0; i < aryXOver.length; i++) {
+                if (p1[1] == aryXOver[i][1] && p2[1] == aryXOver[i][1]) {
+                    if (p1[0] > p2[0] && (aryXOver[i][0] > p2[0] && aryXOver[i][0] < p1[0]))
+                    {return true;}
+                    if (p1[0] < p2[0] && (aryXOver[i][0] < p2[0] && aryXOver[i][0] > p1[0]))
+                    {return true;}
+                }
+            }
+            return false;
+        }
+        function isYCrash(p1, p2) {
+            var bP1=false, bP2=false;
+            for (var i = 0; i < aryYOver.length; i++) {
+                if (p1[0] == aryYOver[i][0] && p1[1] == aryYOver[i][1]) {
+                    bP1 = true;
+                }
+                if (p2[0] == aryYOver[i][0] && p2[1] == aryYOver[i][1]) {
+                    bP2 = true;
+                }
+            }
+            if ((p1[0] ==  p2[0]) && bP1 && bP2) {
+                return true;
+            }
+            for (i = 0; i < aryYOver.length; i++) {
+                if (p1[0] == aryYOver[i][0] && p2[0] == aryYOver[i][0]) {
+                    if (p1[1] > p2[1] && (aryYOver[i][1] > p2[1] && aryYOver[i][1] < p1[1]))
+                    {return true;}
+                    if (p1[1] < p2[1] && (aryYOver[i][1] < p2[1] && aryYOver[i][1] > p1[1]))
+                    {return true;}
+                }
+            }
+            return false;
+        }
+    </script>
+</head>
+<body>
+    <canvas id="jaMap" width="600" height="600"></canvas>
+    <p id="outPut">Path:</p>
+</body>
+</html>
