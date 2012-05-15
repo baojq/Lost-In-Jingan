@@ -165,7 +165,7 @@
         function findAll() {
             aryAllUsedPath = new Array();
 
-            var iAllpt = 0;
+            
             var distance1 = 0, distance2 = 0, distance3 = 0, distance4 = 0, distance5 = 0;
             for (i = 0; i < ptTree.length; i++) {
                 distance1 = getLength(ptTree[i][0], [startPoint.x + 100, startPoint.y + 100]);
@@ -193,7 +193,7 @@
                                 if (aryAllUsedPath.length >= 200000)
                                 {return true;}
 
-                                ++iAllpt
+                                
                             }
                         }
                     }
